@@ -18,6 +18,16 @@ jobs:
         working-directory: backend
       - run: cargo build --release --verbose
         working-directory: backend
-      - uses: docker/build-push-action@v5
+      - name: Login to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: pcasselacr.azurecr.io
+          username: ${{ secrets.CONTAINER_REGISTRY_USER }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+      - name: docker build and push
+        uses: docker/build-push-action@v5
         with:
           context: backend
+          push: true
+          tags: pcasselacr.azurecr.io/locations-backend:latest
+
