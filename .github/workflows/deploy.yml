@@ -18,3 +18,6 @@ jobs:
         working-directory: backend
       - run: cargo build --release --verbose
         working-directory: backend
+      - uses: docker/build-push-action@v5
+        with:
+          context: backend
