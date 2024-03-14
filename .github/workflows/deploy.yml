@@ -1,12 +1,12 @@
-name: build
+name: deploy
 
 on:
   push:
-  pull_request:
-
+    branches:
+      - main
 jobs:
   build_and_test:
-    name: build and test backend
+    name: build and deploy backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -15,4 +15,6 @@ jobs:
       - run: cargo build --verbose
         working-directory: backend
       - run: cargo test --verbose
+        working-directory: backend
+      - run: cargo build --release --verbose
         working-directory: backend
