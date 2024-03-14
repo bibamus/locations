@@ -3,15 +3,15 @@ use serde::Deserialize;
 use std::env;
 
 #[derive(Deserialize)]
-struct CreateLocation {
+struct CreatePlace {
     name: String,
 }
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/location",
+    let app = Router::new().route("/place",
                                   get(|| async { "Hello, World!" })
-                                      .post(create_location),
+                                      .post(create_place),
     )
         .with_state("");
 
@@ -24,6 +24,6 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn create_location(Json(input): Json<CreateLocation>) {
+async fn create_place(Json(input): Json<CreatePlace>) {
     dbg!(input.name);
 }

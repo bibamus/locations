@@ -30,4 +30,10 @@ jobs:
           context: backend
           push: true
           tags: pcasselacr.azurecr.io/locations-backend:latest
+      - name: helm upgrade
+        run: |
+          echo "$KUBECONFIG" > kubeconfig
+          helm upgrade --install --atomic -n places --create-namespace places-backend ./helm/places-backend --kubeconfig kubeconfig
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
 
