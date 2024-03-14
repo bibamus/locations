@@ -24,6 +24,7 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn create_place(Json(input): Json<CreatePlace>) {
-    dbg!(input.name);
+async fn create_place(Json(input): Json<CreatePlace>) -> String {
+    let name = input.name;
+    return format!("created {name}");
 }
