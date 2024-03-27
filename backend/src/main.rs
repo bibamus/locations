@@ -19,6 +19,7 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 struct CreatePlace {
     name: String,
+    maps_link: String,
 }
 
 
@@ -26,6 +27,7 @@ struct CreatePlace {
 struct Place {
     id: Uuid,
     name: String,
+    maps_link: String,
 }
 
 type ConnectionPool = Pool<PostgresConnectionManager<MakeTlsConnector>>;
@@ -34,7 +36,11 @@ type ConnectionPool = Pool<PostgresConnectionManager<MakeTlsConnector>>;
 async fn init_db(pool: &ConnectionPool) {
     info!("Initializing Databsae");
     let conn = pool.get().await.unwrap();
-    conn.batch_execute("CREATE TABLE IF NOT EXISTS places (id UUID, name VARCHAR NOT NULL)").await.unwrap();
+    conn.batch_execute("CREATE TABLE IF NOT EXISTS \
+     places \
+     (id UUID, \
+      name VARCHAR NOT NULL, \
+      maps_link VARCHAR NOT NULL)").await.unwrap();
     info!("Database initialised");
 }
 
@@ -94,9 +100,12 @@ async fn list_places(State(pool): State<ConnectionPool>) -> impl IntoResponse {
 
 fn row_to_place(r: &Row) -> Place {
     let id: Uuid = r.get("id");
+    let name: String = r.get("name");
+    let maps_link: String = r.get("maps_link");
     return Place {
         id,
-        name: "".to_string(),
+        name,
+        maps_link,
     };
 }
 
@@ -104,9 +113,11 @@ async fn create_place(State(pool): State<ConnectionPool>, Json(input): Json<Crea
     let place = Place {
         id: Uuid::new_v4(),
         name: input.name,
+        maps_link: input.maps_link,
     };
     let conn = pool.get().await.unwrap();
-    conn.execute("INSERT INTO places (id, name) VALUES ($1, $2)", &[&place.id, &place.name]).await.unwrap();
+    conn.execute("INSERT INTO places (id, name, maps_link) VALUES ($1, $2, $3)",
+                 &[&place.id, &place.name, &place.maps_link]).await.unwrap();
     return (StatusCode::CREATED, Json(place));
 }
 
