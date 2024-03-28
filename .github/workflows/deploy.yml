@@ -33,6 +33,7 @@ jobs:
       - name: helm upgrade
         run: |
           echo "$KUBECONFIG" > kubeconfig
+          sed -i "s/APPVERSION_REPLACE/${{ github.run_number }}/" ./helm/places-backend/Chart.yaml
           helm upgrade --install --atomic -n places --create-namespace places-backend ./helm/places-backend --kubeconfig kubeconfig
         env:
           KUBECONFIG: ${{ secrets.KUBECONFIG }}
