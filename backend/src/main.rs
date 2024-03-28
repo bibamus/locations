@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+mod db;
+
 use std::env;
-use std::sync::{Arc, RwLock};
 
 use axum::{Json, Router};
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
@@ -12,9 +12,10 @@ use bb8_postgres::PostgresConnectionManager;
 use log::{debug, info};
 use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
-use serde::{Deserialize, Serialize};
-use tokio_postgres::{Config, NoTls, Row};
+use serde::{Deserialize};
+use tokio_postgres::Config;
 use uuid::Uuid;
+use crate::db::{DB, new_db, Place, PlacesDB};
 
 #[derive(Deserialize)]
 struct CreatePlace {
@@ -23,15 +24,9 @@ struct CreatePlace {
 }
 
 
-#[derive(Debug, Serialize, Clone)]
-struct Place {
-    id: Uuid,
-    name: String,
-    maps_link: String,
-}
+
 
 type ConnectionPool = Pool<PostgresConnectionManager<MakeTlsConnector>>;
-// type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
 
 async fn init_db(pool: &ConnectionPool) {
     info!("Initializing Databsae");
@@ -56,14 +51,17 @@ async fn main() {
         .unwrap();
     let connector = MakeTlsConnector::new(connector);
     let manager = PostgresConnectionManager::new(config, connector);
-    // let manager = PostgresConnectionManager::new(config, NoTls);
     let pool = Pool::builder().build(manager).await.unwrap();
 
     init_db(&pool).await;
 
+    let db = new_db(pool);
 
-    let app = Router::new().route("/place", get(list_places).post(create_place))
-        .with_state(pool);
+
+    let app = Router::new()
+        .route("/place", get(list_places).post(create_place))
+        .route("/place/:id",get(get_place))
+        .with_state(db);
 
 
     let port = env::var("PORT").unwrap_or_else(|_| "3000".to_string());
@@ -88,37 +86,23 @@ fn get_postgres_config() -> Config {
         .dbname(database.as_str()).to_owned();
 }
 
-async fn list_places(State(pool): State<ConnectionPool>) -> impl IntoResponse {
-    let conn = pool.get().await.unwrap();
-    let vec = conn.query("SELECT * FROM places", &[]).await.unwrap();
-    let places = vec.iter()
-        .map(row_to_place)
-        .collect::<Vec<_>>();
-
+async fn list_places(State(db): State<DB>) -> impl IntoResponse {
+    let places = db.list_places().await;
     return Json(places);
 }
 
-fn row_to_place(r: &Row) -> Place {
-    let id: Uuid = r.get("id");
-    let name: String = r.get("name");
-    let maps_link: String = r.get("maps_link");
-    return Place {
-        id,
-        name,
-        maps_link,
-    };
+async fn get_place(State(db) : State<DB>, Path(id): Path<Uuid>) -> impl IntoResponse {
+    let place = db.get_place(id).await;
+    return Json(place);
 }
 
-async fn create_place(State(pool): State<ConnectionPool>, Json(input): Json<CreatePlace>) -> impl IntoResponse {
+
+async fn create_place(State(db): State<DB>, Json(input): Json<CreatePlace>) -> impl IntoResponse {
     let place = Place {
         id: Uuid::new_v4(),
         name: input.name,
         maps_link: input.maps_link,
     };
-    let conn = pool.get().await.unwrap();
-    conn.execute("INSERT INTO places (id, name, maps_link) VALUES ($1, $2, $3)",
-                 &[&place.id, &place.name, &place.maps_link]).await.unwrap();
+    let place = db.create_place(place).await;
     return (StatusCode::CREATED, Json(place));
 }
-
-type Db = Arc<RwLock<HashMap<Uuid, Place>>>;
