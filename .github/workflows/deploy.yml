@@ -5,7 +5,7 @@ on:
     branches:
       - main
 jobs:
-  build_and_test:
+  deploy_backend:
     name: build and deploy backend
     runs-on: ubuntu-latest
     steps:
@@ -35,6 +35,36 @@ jobs:
           echo "$KUBECONFIG" > kubeconfig
           sed -i "s/APPVERSION_REPLACE/${{ github.run_number }}/" ./helm/places-backend/Chart.yaml
           helm upgrade --install --atomic -n places --create-namespace places-backend ./helm/places-backend --kubeconfig kubeconfig
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+  deploy_frontend:
+    name: build and deploy frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm install
+        working-directory: frontend
+      - run: npm run lint || true
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - name: Login to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: pcasselacr.azurecr.io
+          username: ${{ secrets.CONTAINER_REGISTRY_USER }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+      - name: docker build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: frontend
+          push: true
+          tags: pcasselacr.azurecr.io/locations-frontend:latest
+      - name: helm upgrade
+        run: |
+          echo "$KUBECONFIG" > kubeconfig
+          sed -i "s/APPVERSION_REPLACE/${{ github.run_number }}/" ./helm/places-frontend/Chart.yaml
+          helm upgrade --install --atomic -n places --create-namespace places-frontend ./helm/places-frontend --kubeconfig kubeconfig
         env:
           KUBECONFIG: ${{ secrets.KUBECONFIG }}
 

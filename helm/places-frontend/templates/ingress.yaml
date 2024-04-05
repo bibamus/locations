@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "places-frontend.fullname" . }}
+  labels:
+    {{- include "places-frontend.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - places.cluster.azure.ludimus.de
+      secretName: {{ include "places-frontend.fullname" . }}-tls
+  rules:
+    - host: places.cluster.azure.ludimus.de
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "places-frontend.fullname" $ }}
+                port:
+                  name: http
