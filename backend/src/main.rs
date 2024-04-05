@@ -1,5 +1,3 @@
-mod db;
-
 use std::env;
 
 use axum::{Json, Router};
@@ -12,18 +10,19 @@ use bb8_postgres::PostgresConnectionManager;
 use log::{debug, info};
 use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
-use serde::{Deserialize};
+use serde::Deserialize;
 use tokio_postgres::Config;
 use uuid::Uuid;
+
 use crate::db::{DB, new_db, Place, PlacesDB};
+
+mod db;
 
 #[derive(Deserialize)]
 struct CreatePlace {
     name: String,
     maps_link: String,
 }
-
-
 
 
 type ConnectionPool = Pool<PostgresConnectionManager<MakeTlsConnector>>;
@@ -62,7 +61,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/place", get(list_places).post(create_place))
-        .route("/place/:id",get(get_place))
+        .route("/place/:id", get(get_place).patch(update_place).delete(delete_place))
         .with_state(db);
 
 
@@ -73,7 +72,7 @@ async fn main() {
 
 fn get_postgres_config() -> Result<Config, std::env::VarError> {
     let host = env::var("POSTGRES_HOST")?;
-    let port: u16 = env::var("POSTGRES_PORT")?.parse().map_err(|_| std::env::VarError::NotPresent)?;
+    let port: u16 = env::var("POSTGRES_PORT")?.parse().map_err(|_| env::VarError::NotPresent)?;
     let user = env::var("POSTGRES_USER")?;
     let password = env::var("POSTGRES_PASSWORD")?;
     let database = env::var("POSTGRES_DATABASE")?;
@@ -94,7 +93,7 @@ async fn list_places(State(db): State<DB>) -> impl IntoResponse {
     return Json(places);
 }
 
-async fn get_place(State(db) : State<DB>, Path(id): Path<Uuid>) -> impl IntoResponse {
+async fn get_place(State(db): State<DB>, Path(id): Path<Uuid>) -> impl IntoResponse {
     let place = db.get_place(id).await;
     return Json(place);
 }
@@ -108,4 +107,20 @@ async fn create_place(State(db): State<DB>, Json(input): Json<CreatePlace>) -> i
     };
     let place = db.create_place(place).await;
     return (StatusCode::CREATED, Json(place));
+}
+
+async fn update_place(State(db): State<DB>, Path(id): Path<Uuid>, Json(input): Json<CreatePlace>) -> impl IntoResponse {
+    let place = Place {
+        id,
+        name: input.name.clone(),
+        maps_link: input.maps_link.clone(),
+    };
+    let place = db.update_place(place).await;
+    return Json(place);
+}
+
+
+async fn delete_place(State(db): State<DB>, Path(id): Path<Uuid>) -> impl IntoResponse {
+    db.delete_place(id).await;
+    return StatusCode::NO_CONTENT;
 }

@@ -18,6 +18,8 @@ pub trait PlacesDB {
     async fn get_place(&self, id: Uuid) -> Place;
     async fn list_places(&self) -> Vec<Place>;
     async fn create_place(&self, place: Place) -> Place;
+    async fn update_place(&self, place: Place) -> Place;
+    async fn delete_place(&self, id: Uuid);
 }
 
 #[derive(Clone)]
@@ -62,5 +64,17 @@ impl PlacesDB for DB {
         conn.execute("INSERT INTO places (id, name, maps_link) VALUES ($1, $2, $3)",
                      &[&place.id, &place.name, &place.maps_link]).await.unwrap();
         return place;
+    }
+
+    async fn update_place(&self, place: Place) -> Place {
+        let conn = self.pool.get().await.unwrap();
+        conn.execute("UPDATE places SET name = $2, maps_link = $3 WHERE id = $1",
+                     &[&place.id, &place.name, &place.maps_link]).await.unwrap();
+        return place;
+    }
+
+    async fn delete_place(&self, id: Uuid) {
+        let conn = self.pool.get().await.unwrap();
+        conn.execute("DELETE FROM places WHERE id = $1", &[&id]).await.unwrap();
     }
 }
