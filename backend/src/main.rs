@@ -28,15 +28,17 @@ struct CreatePlace {
 
 type ConnectionPool = Pool<PostgresConnectionManager<MakeTlsConnector>>;
 
-async fn init_db(pool: &ConnectionPool) {
-    info!("Initializing Databsae");
-    let conn = pool.get().await.unwrap();
+
+async fn init_db(pool: &ConnectionPool) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Initializing Database");
+    let conn = pool.get().await?;
     conn.batch_execute("CREATE TABLE IF NOT EXISTS \
      places \
      (id UUID, \
       name VARCHAR NOT NULL, \
-      maps_link VARCHAR NOT NULL)").await.unwrap();
+      maps_link VARCHAR NOT NULL)").await?;
     info!("Database initialised");
+    Ok(())
 }
 
 #[tokio::main]
@@ -45,15 +47,15 @@ async fn main() {
 
     info!("Application starting.");
 
-    let config = get_postgres_config();
+    let pg_config = get_postgres_config().unwrap();
     let connector = TlsConnector::builder()
         .build()
         .unwrap();
     let connector = MakeTlsConnector::new(connector);
-    let manager = PostgresConnectionManager::new(config, connector);
+    let manager = PostgresConnectionManager::new(pg_config, connector);
     let pool = Pool::builder().build(manager).await.unwrap();
 
-    init_db(&pool).await;
+    init_db(&pool).await.unwrap();
 
     let db = new_db(pool);
 
@@ -69,21 +71,22 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-fn get_postgres_config() -> Config {
-    let host = env::var("POSTGRES_HOST").unwrap();
-    let port: u16 = env::var("POSTGRES_PORT").unwrap().parse().unwrap();
-    let user = env::var("POSTGRES_USER").unwrap();
-    let password = env::var("POSTGRES_PASSWORD").unwrap();
-    let database = env::var("POSTGRES_DATABASE").unwrap();
+fn get_postgres_config() -> Result<Config, std::env::VarError> {
+    let host = env::var("POSTGRES_HOST")?;
+    let port: u16 = env::var("POSTGRES_PORT")?.parse().map_err(|_| std::env::VarError::NotPresent)?;
+    let user = env::var("POSTGRES_USER")?;
+    let password = env::var("POSTGRES_PASSWORD")?;
+    let database = env::var("POSTGRES_DATABASE")?;
 
     debug!("Postgres config host={host}, port={port} user={user} password={password} database={database}");
 
-    return Config::new()
-        .host(host.as_str())
+    Ok(Config::new()
+        .host(&host)
         .port(port)
-        .user(user.as_str())
-        .password(password.as_str())
-        .dbname(database.as_str()).to_owned();
+        .user(&user)
+        .password(&password)
+        .dbname(&database)
+        .clone())
 }
 
 async fn list_places(State(db): State<DB>) -> impl IntoResponse {
