@@ -1,16 +1,22 @@
+use std::collections::HashMap;
 use std::env;
 
 use axum::{Json, Router};
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::extract::{Path, Request, State};
+use axum::http::{HeaderMap, StatusCode};
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum_extra::headers::{Authorization, Header, HeaderMapExt};
+use axum_extra::headers::authorization::Bearer;
+use axum_extra::TypedHeader;
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
+use jsonwebtoken::{Algorithm, decode, decode_header, DecodingKey, TokenData, Validation};
 use log::{debug, info};
 use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio_postgres::Config;
 use uuid::Uuid;
 
@@ -26,6 +32,7 @@ struct CreatePlace {
 
 
 type ConnectionPool = Pool<PostgresConnectionManager<MakeTlsConnector>>;
+type DecodingKeys = HashMap<String, DecodingKey>;
 
 
 async fn init_db(pool: &ConnectionPool) -> Result<(), Box<dyn std::error::Error>> {
@@ -46,6 +53,10 @@ async fn main() {
 
     info!("Application starting.");
 
+    let decoding_keys = load_auth_public_keys().await;
+
+    info!("Loaded keys: {:?}", decoding_keys.len());
+
     let pg_config = get_postgres_config().unwrap();
     let connector = TlsConnector::builder()
         .build()
@@ -62,12 +73,65 @@ async fn main() {
     let app = Router::new()
         .route("/place", get(list_places).post(create_place))
         .route("/place/:id", get(get_place).patch(update_place).delete(delete_place))
+        .route_layer(middleware::from_fn_with_state(decoding_keys, auth))
         .with_state(db);
 
 
     let port = env::var("PORT").unwrap_or_else(|_| "3000".to_string());
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+
+#[derive(Deserialize)]
+struct Keys {
+    keys: Vec<Key>,
+}
+
+#[derive(Deserialize)]
+struct Key {
+    kid: String,
+    #[serde(rename = "use")] use_: String,
+    kty: String,
+    e: String,
+    n: String,
+}
+
+async fn load_auth_public_keys() -> HashMap<String, DecodingKey> {
+    let url = "https://login.microsoftonline.com/b2748d0a-856e-4184-bda8-831f9ffa8a48/discovery/keys?appid=a4b8584b-9fbd-4bc0-bbfb-363589f1743b";
+    let res = reqwest::get(url).await.unwrap();
+    let keys: Keys = res.json().await.unwrap();
+
+    let mut map = HashMap::new();
+
+    keys.keys.iter()
+        .filter(|key| key.use_ == "sig" && key.kty == "RSA")
+        .for_each(|key| {
+            debug!("Loaded key: {:?}", key.kid);
+            map.insert(key.kid.clone(), DecodingKey::from_rsa_components(&key.n, &key.e).unwrap());
+        });
+
+    return map;
+}
+
+
+async fn auth(
+    State(decoding_keys): State<DecodingKeys>,
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let auth_header: Option<Authorization<Bearer>> = headers.typed_get();
+    let resp = match auth_header {
+        None => next.run(request),
+        Some(auth_header) => {
+            let token = auth_header.token();
+            debug!("Token: {:?}", token);
+            validate_token(token, decoding_keys);
+            next.run(request)
+        }
+    };
+    Ok(resp.await)
 }
 
 fn get_postgres_config() -> Result<Config, std::env::VarError> {
@@ -123,4 +187,30 @@ async fn update_place(State(db): State<DB>, Path(id): Path<Uuid>, Json(input): J
 async fn delete_place(State(db): State<DB>, Path(id): Path<Uuid>) -> impl IntoResponse {
     db.delete_place(id).await;
     return StatusCode::NO_CONTENT;
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    upn: String,
+    roles: Vec<String>,
+}
+
+fn validate_token(token: &str, decoding_keys: DecodingKeys) {
+    let header = decode_header(token).unwrap();
+    let kid = header.kid.unwrap();
+    debug!("Found kid: {:?}", kid);
+    match decoding_keys.get(&kid) {
+        None => {
+            debug!("No key found for kid: {:?}", kid);
+        }
+        Some(key) => {
+            debug!("Found key for kid: {:?}", kid);
+            let mut validation = Validation::new(Algorithm::RS256);
+            validation.set_audience(&["api://places.cluster.azure.ludimus.de"]);
+            let token_data = decode::<Claims>(token, key, &validation).unwrap();
+            let claims = token_data.claims;
+            debug!("Claims: {:?}", claims)
+        }
+    }
 }
