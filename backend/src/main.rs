@@ -1,11 +1,11 @@
 use std::env;
 
-use axum::{Json, Router};
+use axum::{Extension, Json, Router};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::middleware::{self};
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use log::{debug, info};
 use serde::Deserialize;
 use tokio_postgres::Config;
@@ -37,6 +37,7 @@ async fn main() {
     let app = Router::new()
         .route("/place", get(list_places).post(create_place))
         .route("/place/:id", get(get_place).patch(update_place).delete(delete_place))
+        .route("/place/:id/rating", post(rate_place))
         .route_layer(middleware::from_fn_with_state(decoding_keys, auth))
         .layer(CorsLayer::permissive())
         .with_state(db);
@@ -108,4 +109,12 @@ async fn update_place(State(db): State<DB>, Path(id): Path<Uuid>, Json(input): J
 async fn delete_place(State(db): State<DB>, Path(id): Path<Uuid>) -> impl IntoResponse {
     db.delete_place(id).await;
     return StatusCode::NO_CONTENT;
+}
+
+async fn rate_place(State(db): State<DB>,
+                    Path(id): Path<Uuid>,
+                    Extension(claims): Extension<auth::Claims>,
+                    Json(input): Json<i32>) -> impl IntoResponse {
+    let place = db.rate_place(id, claims.upn, input).await;
+    return Json(place);
 }

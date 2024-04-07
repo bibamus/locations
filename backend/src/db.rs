@@ -16,12 +16,19 @@ pub struct Place {
     pub maps_link: String,
 }
 
+pub struct Rating {
+    pub place_id: Uuid,
+    pub user_id: Uuid,
+    pub rating: i32,
+}
+
 pub trait PlacesDB {
     async fn get_place(&self, id: Uuid) -> Place;
     async fn list_places(&self) -> Vec<Place>;
     async fn create_place(&self, place: Place) -> Place;
     async fn update_place(&self, place: Place) -> Place;
     async fn delete_place(&self, id: Uuid);
+    async fn rate_place(&self, place_id: Uuid, user_id: String, rating: i32) -> Place;
 }
 
 #[derive(Clone)]
@@ -60,7 +67,17 @@ impl DB {
          places \
          (id UUID, \
           name VARCHAR NOT NULL, \
-          maps_link VARCHAR NOT NULL)").await?;
+          maps_link VARCHAR NOT NULL,\
+          PRIMARY KEY (id) \
+          )").await?;
+
+        conn.batch_execute("CREATE TABLE IF NOT EXISTS \
+            ratings \
+            (place_id UUID, \
+            user_id VARCHAR NOT NULL, \
+            rating INT NOT NULL,\
+            PRIMARY KEY (place_id, user_id) \
+            )").await?;
         info!("Database initialised");
         Ok(())
     }
@@ -98,5 +115,13 @@ impl PlacesDB for DB {
     async fn delete_place(&self, id: Uuid) {
         let conn = self.pool.get().await.unwrap();
         conn.execute("DELETE FROM places WHERE id = $1", &[&id]).await.unwrap();
+    }
+
+    async fn rate_place(&self, place_id: Uuid, user_id: String, rating: i32) -> Place {
+        let conn = self.pool.get().await.unwrap();
+        conn.execute("INSERT INTO ratings (place_id, user_id, rating) VALUES ($1, $2, $3) \
+                      ON CONFLICT (place_id, user_id) DO UPDATE SET rating = $3",
+                     &[&place_id, &user_id, &rating]).await.unwrap();
+        return self.get_place(place_id).await;
     }
 }

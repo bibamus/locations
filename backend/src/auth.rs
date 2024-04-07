@@ -14,8 +14,8 @@ type DecodingKeys = HashMap<String, DecodingKey>;
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Claims {
-    upn: String,
+pub(crate) struct Claims {
+    pub upn: String,
     roles: Vec<String>,
 }
 
