@@ -1,8 +1,10 @@
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
+use log::info;
+use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
 use serde::Serialize;
-use tokio_postgres::Row;
+use tokio_postgres::{Config, Row};
 use uuid::Uuid;
 
 type ConnectionPool = Pool<PostgresConnectionManager<MakeTlsConnector>>;
@@ -27,11 +29,6 @@ pub struct DB {
     pool: ConnectionPool,
 }
 
-pub fn new_db(pool: ConnectionPool) -> DB {
-    return DB {
-        pool
-    };
-}
 
 fn row_to_place(r: &Row) -> Place {
     let id: Uuid = r.get("id");
@@ -42,6 +39,31 @@ fn row_to_place(r: &Row) -> Place {
         name,
         maps_link,
     };
+}
+
+impl DB {
+    pub async fn new_db(config: Config) -> DB {
+        let connector = TlsConnector::builder()
+            .build()
+            .unwrap();
+        let connector = MakeTlsConnector::new(connector);
+        let manager = PostgresConnectionManager::new(config, connector);
+        let pool = Pool::builder().build(manager).await.unwrap();
+        return DB {
+            pool
+        };
+    }
+    pub async fn init_db(&self) -> Result<(), Box<dyn std::error::Error>> {
+        info!("Initializing Database");
+        let conn = self.pool.get().await?;
+        conn.batch_execute("CREATE TABLE IF NOT EXISTS \
+         places \
+         (id UUID, \
+          name VARCHAR NOT NULL, \
+          maps_link VARCHAR NOT NULL)").await?;
+        info!("Database initialised");
+        Ok(())
+    }
 }
 
 impl PlacesDB for DB {
