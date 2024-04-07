@@ -22,3 +22,4 @@ postgres-native-tls = "0.5.0"
 native-tls = "0.2.11"
 jsonwebtoken = "9.3.0"
 reqwest = { version = "0.12.2", features = ["json"] }
+rust_decimal = { version = "1.35.0", features = ["db-tokio-postgres"]}

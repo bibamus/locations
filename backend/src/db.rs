@@ -3,6 +3,8 @@ use bb8_postgres::PostgresConnectionManager;
 use log::info;
 use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use serde::Serialize;
 use tokio_postgres::{Config, Row};
 use uuid::Uuid;
@@ -14,6 +16,23 @@ pub struct Place {
     pub id: Uuid,
     pub name: String,
     pub maps_link: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct PlaceWithRating {
+    pub place: Place,
+    pub average_rating: f64,
+    pub own_rating: i32,
+}
+
+impl Place {
+    pub(crate) fn new(name: String, maps_link: String) -> Place {
+        return Place {
+            id: Uuid::new_v4(),
+            name,
+            maps_link,
+        };
+    }
 }
 
 pub struct Rating {
@@ -29,6 +48,8 @@ pub trait PlacesDB {
     async fn update_place(&self, place: Place) -> Place;
     async fn delete_place(&self, id: Uuid);
     async fn rate_place(&self, place_id: Uuid, user_id: String, rating: i32) -> Place;
+    async fn get_place_with_rating(&self, id: Uuid, user_id: String) -> PlaceWithRating;
+    async fn list_places_with_rating(&self, user_id: String) -> Vec<PlaceWithRating>;
 }
 
 #[derive(Clone)]
@@ -41,10 +62,25 @@ fn row_to_place(r: &Row) -> Place {
     let id: Uuid = r.get("id");
     let name: String = r.get("name");
     let maps_link: String = r.get("maps_link");
+    // let average_rating: Option<Decimal> = r.get("average_rating");
+    // let own_rating: Option<i32> = r.get("rating");
     return Place {
         id,
         name,
         maps_link,
+        // average_rating: average_rating.map(|d| d.to_f64().unwrap()).unwrap_or(0.0),
+        // own_rating: own_rating.unwrap_or(0),
+    };
+}
+
+fn row_to_place_with_rating(r: &Row) -> PlaceWithRating {
+    let place = row_to_place(r);
+    let average_rating: Option<Decimal> = r.get("average_rating");
+    let own_rating: Option<i32> = r.get("rating");
+    return PlaceWithRating {
+        place,
+        average_rating: average_rating.map(|d| d.to_f64().unwrap()).unwrap_or(0.0),
+        own_rating: own_rating.unwrap_or(0),
     };
 }
 
@@ -92,9 +128,35 @@ impl PlacesDB for DB {
 
     async fn list_places(&self) -> Vec<Place> {
         let conn = self.pool.get().await.unwrap();
-        let vec = conn.query("SELECT * FROM places", &[]).await.unwrap();
+        let vec = conn.query("SELECT * FROM places ORDER BY name ASC
+        ", &[]).await.unwrap();
         return vec.iter()
             .map(row_to_place)
+            .collect::<Vec<_>>();
+    }
+
+    async fn get_place_with_rating(&self, id: Uuid, user_id: String) -> PlaceWithRating {
+        let conn = self.pool.get().await.unwrap();
+        let row = conn.query_one("SELECT * FROM places LEFT JOIN \
+        (SELECT place_id, rating FROM ratings WHERE user_id = $2) AS own_rating on places.id = own_rating.place_id \
+        LEFT JOIN \
+            (SELECT place_id, AVG(rating) as average_rating FROM ratings GROUP BY place_id) \
+            AS ratings ON places.id = ratings.place_id
+         WHERE id = $1", &[&id, &user_id]).await.unwrap();
+        return row_to_place_with_rating(&row);
+    }
+
+    async fn list_places_with_rating(&self, user_id: String) -> Vec<PlaceWithRating> {
+        let conn = self.pool.get().await.unwrap();
+        let vec = conn.query("SELECT * FROM places LEFT JOIN \
+        (SELECT place_id, rating FROM ratings WHERE user_id = $1) AS own_rating on places.id = own_rating.place_id \
+         LEFT JOIN \
+            (SELECT place_id, AVG(rating) as average_rating FROM ratings GROUP BY place_id) \
+            AS ratings ON places.id = ratings.place_id
+         ORDER BY name ASC
+        ", &[&user_id]).await.unwrap();
+        return vec.iter()
+            .map(row_to_place_with_rating)
             .collect::<Vec<_>>();
     }
 

@@ -74,33 +74,31 @@ struct CreatePlace {
     maps_link: String,
 }
 
-async fn list_places(State(db): State<DB>) -> impl IntoResponse {
-    let places = db.list_places().await;
+async fn list_places(State(db): State<DB>,
+                     Extension(claims): Extension<auth::Claims>,
+) -> impl IntoResponse {
+    let places = db.list_places_with_rating(claims.upn).await;
     return Json(places);
 }
 
-async fn get_place(State(db): State<DB>, Path(id): Path<Uuid>) -> impl IntoResponse {
-    let place = db.get_place(id).await;
+async fn get_place(State(db): State<DB>,
+                   Extension(claims): Extension<auth::Claims>,
+                   Path(id): Path<Uuid>) -> impl IntoResponse {
+    let place = db.get_place_with_rating(id, claims.upn).await;
     return Json(place);
 }
 
 
 async fn create_place(State(db): State<DB>, Json(input): Json<CreatePlace>) -> impl IntoResponse {
-    let place = Place {
-        id: Uuid::new_v4(),
-        name: input.name,
-        maps_link: input.maps_link,
-    };
+    let place = Place::new(input.name, input.maps_link);
     let place = db.create_place(place).await;
     return (StatusCode::CREATED, Json(place));
 }
 
 async fn update_place(State(db): State<DB>, Path(id): Path<Uuid>, Json(input): Json<CreatePlace>) -> impl IntoResponse {
-    let place = Place {
-        id,
-        name: input.name.clone(),
-        maps_link: input.maps_link.clone(),
-    };
+    let mut place = db.get_place(id).await;
+    place.name = input.name;
+    place.maps_link = input.maps_link;
     let place = db.update_place(place).await;
     return Json(place);
 }

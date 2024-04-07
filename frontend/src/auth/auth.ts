@@ -1,17 +1,13 @@
 import {type Configuration, LogLevel, type PopupRequest, PublicClientApplication} from "@azure/msal-browser";
 
 const config: Configuration = {
-    // required
     auth: {
-        // must match info in dashboard
         clientId: "a4b8584b-9fbd-4bc0-bbfb-363589f1743b",
         authority: "https://login.microsoftonline.com/b2748d0a-856e-4184-bda8-831f9ffa8a48/v2.0",
 
-        // login redirect; must match path in dashboard
         redirectUri: `${location.origin}/`,
     },
 
-    // optional
     system: {
         loggerOptions: {
             logLevel: LogLevel.Error,
