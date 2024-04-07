@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import Places from "@/components/Places.vue";
+import Places from "@/components/PlacesMain.vue";
 import {onMounted, ref} from "vue";
-import {login, getToken} from "./auth/auth"
+import {login} from "./auth/auth"
 
 const authenticated = ref(false)
 
 onMounted(async () => {
-  console.log('App.vue')
   await login();
   authenticated.value = true
-  const token = await getToken();
-  // console.log(token)
 })
 
 </script>

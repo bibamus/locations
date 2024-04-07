@@ -52,7 +52,7 @@ export async function login(): Promise<void> {
         .then(() => msal.acquireTokenSilent(request)
             .catch(() => msal.acquireTokenPopup(request)))
         .then(value => msal.setActiveAccount(value.account))
-        .then(value => undefined);
+        .then(() => undefined);
 }
 
 export async function getToken(): Promise<string> {
@@ -60,12 +60,9 @@ export async function getToken(): Promise<string> {
         redirectUri: config.auth.redirectUri,
         scopes: ["api://places.cluster.azure.ludimus.de/ReadWrite"],
     }
-    return msal
-        .initialize()
-        .then(() => msal.acquireTokenSilent(request)
-            .catch(() => msal.acquireTokenPopup(request)))
+    return msal.acquireTokenSilent(request)
+        .catch(() => msal.acquireTokenPopup(request))
         .then(value => {
-            console.log(value);
             return value.accessToken;
         });
 }

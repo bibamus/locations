@@ -19,6 +19,7 @@ use postgres_native_tls::MakeTlsConnector;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Config;
 use uuid::Uuid;
+use tower_http::cors::CorsLayer;
 
 use crate::db::{DB, new_db, Place, PlacesDB};
 
@@ -74,6 +75,7 @@ async fn main() {
         .route("/place", get(list_places).post(create_place))
         .route("/place/:id", get(get_place).patch(update_place).delete(delete_place))
         .route_layer(middleware::from_fn_with_state(decoding_keys, auth))
+        .layer(CorsLayer::permissive())
         .with_state(db);
 
 
