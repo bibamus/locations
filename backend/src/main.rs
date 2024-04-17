@@ -113,6 +113,11 @@ async fn rate_place(State(db): State<DB>,
                     Path(id): Path<Uuid>,
                     Extension(claims): Extension<auth::Claims>,
                     Json(input): Json<i32>) -> impl IntoResponse {
-    let place = db.rate_place(id, claims.upn, input).await;
-    return Json(place);
+    return match input {
+        1..=5 => {
+            let place = db.rate_place(id, claims.upn, input).await;
+            Json(place).into_response()
+        }
+        _ => StatusCode::BAD_REQUEST.into_response()
+    };
 }

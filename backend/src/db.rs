@@ -62,14 +62,10 @@ fn row_to_place(r: &Row) -> Place {
     let id: Uuid = r.get("id");
     let name: String = r.get("name");
     let maps_link: String = r.get("maps_link");
-    // let average_rating: Option<Decimal> = r.get("average_rating");
-    // let own_rating: Option<i32> = r.get("rating");
     return Place {
         id,
         name,
         maps_link,
-        // average_rating: average_rating.map(|d| d.to_f64().unwrap()).unwrap_or(0.0),
-        // own_rating: own_rating.unwrap_or(0),
     };
 }
 
