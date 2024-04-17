@@ -1,4 +1,13 @@
+import {getToken} from "@/auth/auth"
+
 const baseurl =  import.meta.env.VITE_API_BASEURL ?? "";
+
+
+export interface PlaceWithRating {
+    place: Place;
+    average_rating: number;
+    own_rating: number;
+}
 
 export interface Place {
     id: string;
@@ -6,11 +15,13 @@ export interface Place {
     maps_link: string;
 }
 
-export async function getPlaces(): Promise<Place[]> {
+export async function getPlaces(): Promise<PlaceWithRating[]> {
+    const token = await getToken();
     const response = await fetch(`${baseurl}/place`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
         },
     });
     if (!response.ok) {

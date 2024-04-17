@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {onMounted, ref} from "vue";
-import {getPlaces, type Place} from "@/api/api";
+import {getPlaces, type PlaceWithRating} from "@/api/api";
 
-const places = ref([] as Place[]);
+const places = ref([] as PlaceWithRating[]);
 
 onMounted(async () => {
   places.value = await getPlaces();
@@ -11,8 +11,8 @@ onMounted(async () => {
 
 <template>
   <ul>
-    <li v-for="place in places" :key="place.id">
-      {{place.id}} - {{place.name}}
+    <li v-for="place in places" :key="place.place.id">
+      {{place.place.id}} - {{place.place.name}} - {{place.own_rating}} - {{place.average_rating.toFixed(1)}}
     </li>
   </ul>
 
