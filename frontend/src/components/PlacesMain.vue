@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {onMounted, ref} from "vue";
-import {getPlaces, type PlaceWithRating} from "@/api/api";
+import {onMounted, ref, watch} from "vue";
+import {createPlace, getPlaces, type Place, type PlaceWithRating, updatePlace} from "@/api/api";
 
 
 const headers = ref([
@@ -16,12 +16,37 @@ const headers = ref([
 ])
 
 const placesWithRating = ref([] as PlaceWithRating[]);
+const currentEditItem = ref({} as Place);
+
+const dialog = ref(false)
 
 
 onMounted(async () => {
-  let result = await getPlaces();
-  placesWithRating.value = result;
+  placesWithRating.value = await getPlaces();
 })
+
+watch(dialog, (newVal) => {
+  if (!newVal) {
+    currentEditItem.value = {} as Place;
+  }
+});
+
+function editItem(item: Place) {
+  currentEditItem.value = Object.assign({}, item);
+  dialog.value = true;
+}
+
+async function saveItem() {
+  let data = currentEditItem.value;
+  if (data.id == null) {
+    await createPlace(data);
+  } else {
+    await updatePlace(data);
+  }
+  dialog.value = false;
+  placesWithRating.value = await getPlaces();
+}
+
 </script>
 
 <template>
@@ -32,7 +57,7 @@ onMounted(async () => {
     <template v-slot:top>
       <v-toolbar flat>
         <v-toolbar-title>Places</v-toolbar-title>
-        <v-dialog>
+        <v-dialog v-model="dialog">
           <template v-slot:activator="{ props }">
             <v-btn class="mb-2" color="primary" dark v-bind="props">
               <v-icon icon="mdi-plus"></v-icon>
@@ -43,13 +68,37 @@ onMounted(async () => {
             <v-card-title>
               <span class="text-h5">New Place</span>
             </v-card-title>
+            <v-container>
+              <v-row>
+                <v-col>
+                  <v-text-field
+                      v-model="currentEditItem.name"
+                      label="Name"
+                  ></v-text-field>
+                </v-col>
+                <v-col>
+                  <v-text-field
+                      v-model="currentEditItem.maps_link"
+                      label="Maps Link"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <v-btn @click="dialog = false">Cancel</v-btn>
+                </v-col>
+                <v-col>
+                  <v-btn @click="saveItem()" color="primary">Save</v-btn>
+                </v-col>
+              </v-row>
+            </v-container>
           </v-card>
 
         </v-dialog>
       </v-toolbar>
     </template>
     <template v-slot:[`item.actions`]="{ item }">
-      <v-icon icon="mdi-pencil">
+      <v-icon icon="mdi-pencil" @click="editItem(item.place)">
       </v-icon>
     </template>
     <template v-slot:bottom></template>

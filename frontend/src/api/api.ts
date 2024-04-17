@@ -44,3 +44,18 @@ export async function createPlace(place: Place): Promise<void> {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
 }
+
+export async function updatePlace(place: Place): Promise<void> {
+    const token = await getToken();
+    const response = await fetch(`${baseurl}/place/${place.id}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(place),
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+}

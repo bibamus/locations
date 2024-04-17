@@ -36,7 +36,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/place", get(list_places).post(create_place))
-        .route("/place/:id", get(get_place).patch(update_place).delete(delete_place))
+        .route("/place/:id", get(get_place).put(update_place).delete(delete_place))
         .route("/place/:id/rating", post(rate_place))
         .route_layer(middleware::from_fn_with_state(decoding_keys, auth))
         .layer(CorsLayer::permissive())
