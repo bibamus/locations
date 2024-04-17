@@ -97,8 +97,7 @@ async fn create_place(State(db): State<DB>, Json(input): Json<CreatePlace>) -> i
 
 async fn update_place(State(db): State<DB>, Path(id): Path<Uuid>, Json(input): Json<CreatePlace>) -> impl IntoResponse {
     let mut place = db.get_place(id).await;
-    place.name = input.name;
-    place.maps_link = input.maps_link;
+    let place = Place { name: input.name, maps_link: input.maps_link, ..place };
     let place = db.update_place(place).await;
     return Json(place);
 }

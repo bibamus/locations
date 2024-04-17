@@ -26,7 +26,7 @@ pub struct PlaceWithRating {
 }
 
 impl Place {
-    pub(crate) fn new(name: String, maps_link: String) -> Place {
+    pub fn new(name: String, maps_link: String) -> Place {
         return Place {
             id: Uuid::new_v4(),
             name,
