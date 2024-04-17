@@ -1,6 +1,6 @@
 import {getToken} from "@/auth/auth"
 
-const baseurl =  import.meta.env.VITE_API_BASEURL ?? "";
+const baseurl = import.meta.env.VITE_API_BASEURL ?? "";
 
 
 export interface PlaceWithRating {
@@ -54,6 +54,21 @@ export async function updatePlace(place: Place): Promise<void> {
             "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(place),
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+}
+
+export async function ratePlace(placeId: string, rating: number): Promise<void> {
+    const token = await getToken();
+    const response = await fetch(`${baseurl}/place/${placeId}/rating`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(rating),
     });
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

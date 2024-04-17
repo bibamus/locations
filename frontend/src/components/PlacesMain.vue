@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {onMounted, ref, watch} from "vue";
-import {createPlace, getPlaces, type Place, type PlaceWithRating, updatePlace} from "@/api/api";
+import {createPlace, getPlaces, type Place, type PlaceWithRating, ratePlace, updatePlace} from "@/api/api";
 
 
 const headers = ref([
@@ -44,6 +44,11 @@ async function saveItem() {
     await updatePlace(data);
   }
   dialog.value = false;
+  placesWithRating.value = await getPlaces();
+}
+
+async function rate(placeId: string, value: number) {
+  await ratePlace(placeId, value);
   placesWithRating.value = await getPlaces();
 }
 
@@ -96,6 +101,10 @@ async function saveItem() {
 
         </v-dialog>
       </v-toolbar>
+    </template>
+    <template v-slot:[`item.own_rating`]="{ item }">
+      <v-rating v-model="item.own_rating" active-color="#FFEB3B" length="5" hover @update:model-value="(value: number|string) => rate(item.place.id, value as number)">
+      </v-rating>
     </template>
     <template v-slot:[`item.actions`]="{ item }">
       <v-icon icon="mdi-pencil" @click="editItem(item.place)">
