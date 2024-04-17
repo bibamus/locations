@@ -31,10 +31,12 @@ export async function getPlaces(): Promise<PlaceWithRating[]> {
 }
 
 export async function createPlace(place: Place): Promise<void> {
+    const token = await getToken();
     const response = await fetch(`${baseurl}/place`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(place),
     });
